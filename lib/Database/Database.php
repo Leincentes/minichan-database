@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Minichan\Database;
 
 use PDO;
-use Exception;
 use PDOException;
 use PDOStatement;
 use InvalidArgumentException;
@@ -154,66 +153,50 @@ class Database implements IDatabase
         if (isset($options['prefix'])) {
             $this->prefix = $options['prefix'];
         }
-
+    
         if (isset($options['testMode']) && $options['testMode'] == true) {
             $this->testMode = true;
             return;
         }
-
+    
         $options['type'] = $options['type'] ?? $options['database_type'];
-
+    
         if (!isset($options['pdo'])) {
             $options['database'] = $options['database'] ?? $options['database_name'];
-
+    
             if (!isset($options['socket'])) {
                 $options['host'] = $options['host'] ?? $options['server'] ?? false;
             }
         }
-
-        if (isset($options['type'])) {
-            $this->type = strtolower($options['type']);
-
-            if ($this->type === 'mariadb') {
-                $this->type = 'mysql';
-            }
-        }
-
+    
+        $this->type = strtolower($options['type'] ?? 'mysql');
+        $this->type = ($this->type === 'mariadb') ? 'mysql' : $this->type;
+    
         if (isset($options['logging']) && is_bool($options['logging'])) {
             $this->logging = $options['logging'];
         }
-
+    
         $option = $options['option'] ?? [];
         $commands = [];
-
+    
         switch ($this->type) {
-
             case 'mysql':
-                // Make MySQL using standard quoted identifier.
                 $commands[] = 'SET SQL_MODE=ANSI_QUOTES';
-
                 break;
-
+    
             case 'mssql':
-                // Keep MSSQL QUOTED_IDENTIFIER is ON for standard quoting.
                 $commands[] = 'SET QUOTED_IDENTIFIER ON';
-
-                // Make ANSI_NULLS is ON for NULL value.
                 $commands[] = 'SET ANSI_NULLS ON';
-
                 break;
         }
-
+    
         if (isset($options['pdo'])) {
             if (!$options['pdo'] instanceof PDO) {
                 throw new InvalidArgumentException('Invalid PDO object supplied.');
             }
-
+    
             $this->pdo = $options['pdo'];
-
-            foreach ($commands as $value) {
-                $this->pdo->exec($value);
-            }
-
+            $this->executeCommands($commands);
             return;
         }
 
@@ -249,46 +232,6 @@ class Database implements IDatabase
                         if ($isPort) {
                             $attr['port'] = $port;
                         }
-                    }
-
-                    break;
-
-                case 'pgsql':
-                    $attr = [
-                        'driver' => 'pgsql',
-                        'host' => $options['host'],
-                        'dbname' => $options['database']
-                    ];
-
-                    if ($isPort) {
-                        $attr['port'] = $port;
-                    }
-
-                    break;
-
-                case 'sybase':
-                    $attr = [
-                        'driver' => 'dblib',
-                        'host' => $options['host'],
-                        'dbname' => $options['database']
-                    ];
-
-                    if ($isPort) {
-                        $attr['port'] = $port;
-                    }
-
-                    break;
-
-                case 'oracle':
-                    $attr = [
-                        'driver' => 'oci',
-                        'dbname' => $options['host'] ?
-                            '//' . $options['host'] . ($isPort ? ':' . $port : ':1521') . '/' . $options['database'] :
-                            $options['database']
-                    ];
-
-                    if (isset($options['charset'])) {
-                        $attr['charset'] = $options['charset'];
                     }
 
                     break;
@@ -384,7 +327,7 @@ class Database implements IDatabase
         $dsn = $driver . ':' . implode(';', $stack);
 
         if (
-            in_array($this->type, ['mysql', 'pgsql', 'sybase', 'mssql']) &&
+            in_array($this->type, ['mysql', 'mssql']) &&
             isset($options['charset'])
         ) {
             $commands[] = "SET NAMES '{$options['charset']}'" . (
@@ -400,31 +343,29 @@ class Database implements IDatabase
                 $dsn,
                 $options['username'] ?? null,
                 $options['password'] ?? null,
-                $option
+                array_merge($option, [PDO::ATTR_ERRMODE => $options['error'] ?? PDO::ERRMODE_SILENT])
             );
-
-            if (isset($options['error'])) {
-                $this->pdo->setAttribute(
-                    PDO::ATTR_ERRMODE,
-                    in_array($options['error'], [
-                        PDO::ERRMODE_SILENT,
-                        PDO::ERRMODE_WARNING,
-                        PDO::ERRMODE_EXCEPTION
-                    ]) ?
-                    $options['error'] :
-                    PDO::ERRMODE_SILENT
-                );
-            }
 
             if (isset($options['command']) && is_array($options['command'])) {
                 $commands = array_merge($commands, $options['command']);
             }
 
-            foreach ($commands as $value) {
-                $this->pdo->exec($value);
-            }
+            $this->executeCommands($commands);
         } catch (PDOException $e) {
             throw new PDOException($e->getMessage());
+        }
+    }
+
+    /**
+     * Execute a series of SQL commands on the PDO connection.
+     *
+     * @param array $commands An array of SQL commands to execute.
+     * @throws PDOException If an error occurs while executing the SQL commands.
+     */
+    private function executeCommands(array $commands)
+    {
+        foreach ($commands as $value) {
+            $this->pdo->exec($value);
         }
     }
 
@@ -2265,7 +2206,6 @@ class Database implements IDatabase
         }
     }
 
-
     /**
      * Determine whether the target data existed from the table.
      *
@@ -2294,159 +2234,6 @@ class Database implements IDatabase
         $result = $query->fetchColumn();
 
         return $result === '1' || $result === 1 || $result === true;
-    }
-
-
-    /**
-     * Randomly fetch data from the table.
-     *
-     * @param string $table
-     * @param array $join
-     * @param array|string $columns
-     * @param array $where
-     * @return array
-     */
-    public function rand(string $table, $join = null, $columns = null, $where = null): array
-    {
-        $orderRaw = $this->raw(
-            $this->type === 'mysql' ? 'RAND()'
-                : ($this->type === 'mssql' ? 'NEWID()'
-                : 'RANDOM()')
-        );
-
-        if ($where === null) {
-            if ($this->isJoin($join)) {
-                $where['ORDER'] = $orderRaw;
-            } else {
-                $columns['ORDER'] = $orderRaw;
-            }
-        } else {
-            $where['ORDER'] = $orderRaw;
-        }
-
-        return $this->select($table, $join, $columns, $where);
-    }
-
-    /**
-     * Build for the aggregate function.
-     *
-     * @param string $type
-     * @param string $table
-     * @param array $join
-     * @param string $column
-     * @param array $where
-     * @return string|null
-     */
-    private function aggregate(string $type, string $table, $join = null, $column = null, $where = null): ?string
-    {
-        $map = [];
-
-        $query = $this->exec($this->selectContext($table, $map, $join, $column, $where, $type), $map);
-
-        if (!$this->statement) {
-            return null;
-        }
-
-        
-        return (string) $query->fetchColumn();
-    }
-
-
-    /**
-     * Count the number of rows from the table.
-     *
-     * @param string $table
-     * @param array $join
-     * @param string $column
-     * @param array $where
-     * @return int|null
-     */
-    public function count(string $table, $join = null, $column = null, $where = null): ?int
-    {
-        return (int) $this->aggregate('COUNT', $table, $join, $column, $where);
-    }
-
-    /**
-     * Calculate the average value of the column.
-     *
-     * @param string $table
-     * @param array $join
-     * @param string $column
-     * @param array $where
-     * @return string|null
-     */
-    public function avg(string $table, $join, $column = null, $where = null): ?string
-    {
-        return $this->aggregate('AVG', $table, $join, $column, $where);
-    }
-
-    /**
-     * Get the maximum value of the column.
-     *
-     * @param string $table
-     * @param array $join
-     * @param string $column
-     * @param array $where
-     * @return string|null
-     */
-    public function max(string $table, $join, $column = null, $where = null): ?string
-    {
-        return $this->aggregate('MAX', $table, $join, $column, $where);
-    }
-
-    /**
-     * Get the minimum value of the column.
-     *
-     * @param string $table
-     * @param array $join
-     * @param string $column
-     * @param array $where
-     * @return string|null
-     */
-    public function min(string $table, $join, $column = null, $where = null): ?string
-    {
-        return $this->aggregate('MIN', $table, $join, $column, $where);
-    }
-
-    /**
-     * Calculate the total value of the column.
-     *
-     * @param string $table
-     * @param array $join
-     * @param string $column
-     * @param array $where
-     * @return string|null
-     */
-    public function sum(string $table, $join, $column = null, $where = null): ?string
-    {
-        return $this->aggregate('SUM', $table, $join, $column, $where);
-    }
-
-    /**
-     * Start a transaction.
-     *
-     * @param callable $actions
-     * @codeCoverageIgnore
-     * @return void
-     */
-    public function action(callable $actions): void
-    {
-        if (is_callable($actions)) {
-            $this->pdo->beginTransaction();
-
-            try {
-                $result = $actions($this);
-
-                if ($result === false) {
-                    $this->pdo->rollBack();
-                } else {
-                    $this->pdo->commit();
-                }
-            } catch (Exception $e) {
-                $this->pdo->rollBack();
-                throw $e;
-            }
-        }
     }
 
     /**
