@@ -1,6 +1,69 @@
 
 # DATABASE
 A minimal PHP database helper for ease development.
+
+## Method: `create`
+
+The `create` method is designed to execute a SQL query for creating a table with the specified name, columns, and optional additional options.
+
+## Parameters:
+
+- **$table (string):**
+  The name of the table to be created.
+
+- **$columns (array):**
+  An array representing the columns definition for the new table.
+
+- **$options (array|null):**
+  Additional options for creating the table (optional).
+
+## Return Value
+
+- If the table creation is successful, the method returns a PDOStatement.
+- If the table creation fails, the method returns null.
+
+## Usage
+
+### Example without additional options
+
+```php
+$result = create("your_table", [
+    "column1" => "INT",
+    "column2" => "VARCHAR(255)",
+    "column3" => "TEXT"
+]);
+```
+
+## Method Description:
+
+The `query` method is designed to execute a raw SQL statement with optional parameter bindings.
+
+### Parameters:
+
+- **$statement (string):**
+  The raw SQL statement.
+
+- **$bindings (array):**
+  The array of input parameters value for the prepared statement.
+
+### Return Value:
+
+If the execution is successful, the method returns a `\PDOStatement`. If the execution fails, the method returns `null`.
+
+### Exceptions:
+
+- Throws `\PDOException` if there is an error in the PDO operation.
+
+### Usage:
+
+```php
+// without parameter bindings
+$result = query("SELECT * FROM your_table");
+
+// with parameter bindings
+$result = query("SELECT * FROM your_table WHERE column = ?", ["value"]);
+```
+
 ## Method Description:
 
 The **`select`** method is designed to execute a SELECT query on a specified table, offering flexibility through various parameter combinations.
