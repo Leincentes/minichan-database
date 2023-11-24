@@ -5,9 +5,9 @@
         "database", "database-library"
     ],
     "suggest": {
-        "ext-pdo_sqlite": "For SQLite database",
-        "ext-pdo_sqlsrv": "For MSSQL database",
-        "ext-pdo_mysql": "For MySQL or MariaDB database"
+        "ext-pdo_sqlite": "Use SQLite database",
+        "ext-pdo_sqlsrv": "Use MSSQL database",
+        "ext-pdo_mysql": "Use MySQL or MariaDB database"
     },
     "type": "library",
     "license": "MIT",
