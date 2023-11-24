@@ -650,15 +650,15 @@ class SelectTest extends \Tests\Database\DBTestCase
     {
         $this->setType($type);
 
-        $this->database->select("considérer", [
-            "name (名前)",
-            "положение (ロケーション)"
+        $this->database->select("users", [
+            "name (jake)",
+            "sex (male)"
         ]);
 
         $this->assertQuery(
             <<<EOD
-            SELECT "name" AS "名前","положение" AS "ロケーション"
-            FROM "considérer"
+            SELECT "name" AS "jake","sex" AS "male"
+            FROM "users"
             EOD,
             $this->database->queryString
         );

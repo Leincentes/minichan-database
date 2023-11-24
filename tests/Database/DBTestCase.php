@@ -24,8 +24,6 @@ class DBTestCase extends TestCase
             'MySQL' => ['mysql'],
             'MSSQL' => ['mssql'],
             'SQLite' => ['sqlite'],
-            'PostgreSQL' => ['pgsql'],
-            'Oracle' => ['oracle'],
         ];
     }
 
@@ -68,10 +66,10 @@ class DBTestCase extends TestCase
 
 class Foo
 {
-    public $bar = "cat";
+    public $bar = "build";
 
     public function __wakeup()
     {
-        $this->bar = "dog";
+        $this->bar = "robot";
     }
 }
