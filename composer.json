@@ -1,0 +1,22 @@
+{
+    "name": "minichan-database/minichan-database",
+    "description": "A minimal database framework.",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Minichan\\": "lib/",
+            "Tests\\": "tests/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Niel",
+            "email": "leincentes@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require-dev": {
+        "phpunit/phpunit": "10.5.x-dev"
+    }
+}
