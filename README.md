@@ -2,7 +2,7 @@
 # DATABASE
 A minimal PHP database helper for ease development.
 
-## Method: `create`
+## Method Description:
 
 The `create` method is designed to execute a SQL query for creating a table with the specified name, columns, and optional additional options.
 
