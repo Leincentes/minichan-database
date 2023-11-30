@@ -153,50 +153,66 @@ class Database implements IDatabase
         if (isset($options['prefix'])) {
             $this->prefix = $options['prefix'];
         }
-    
+
         if (isset($options['testMode']) && $options['testMode'] == true) {
             $this->testMode = true;
             return;
         }
-    
+
         $options['type'] = $options['type'] ?? $options['database_type'];
-    
+
         if (!isset($options['pdo'])) {
             $options['database'] = $options['database'] ?? $options['database_name'];
-    
+
             if (!isset($options['socket'])) {
                 $options['host'] = $options['host'] ?? $options['server'] ?? false;
             }
         }
-    
-        $this->type = strtolower($options['type'] ?? 'mysql');
-        $this->type = ($this->type === 'mariadb') ? 'mysql' : $this->type;
-    
+
+        if (isset($options['type'])) {
+            $this->type = strtolower($options['type']);
+
+            if ($this->type === 'mariadb') {
+                $this->type = 'mysql';
+            }
+        }
+
         if (isset($options['logging']) && is_bool($options['logging'])) {
             $this->logging = $options['logging'];
         }
-    
+
         $option = $options['option'] ?? [];
         $commands = [];
-    
+
         switch ($this->type) {
+
             case 'mysql':
+                // Make MySQL using standard quoted identifier.
                 $commands[] = 'SET SQL_MODE=ANSI_QUOTES';
+
                 break;
-    
+
             case 'mssql':
+                // Keep MSSQL QUOTED_IDENTIFIER is ON for standard quoting.
                 $commands[] = 'SET QUOTED_IDENTIFIER ON';
+
+                // Make ANSI_NULLS is ON for NULL value.
                 $commands[] = 'SET ANSI_NULLS ON';
+
                 break;
         }
-    
+
         if (isset($options['pdo'])) {
             if (!$options['pdo'] instanceof PDO) {
                 throw new InvalidArgumentException('Invalid PDO object supplied.');
             }
-    
+
             $this->pdo = $options['pdo'];
-            $this->executeCommands($commands);
+
+            foreach ($commands as $value) {
+                $this->pdo->exec($value);
+            }
+
             return;
         }
 
@@ -327,7 +343,7 @@ class Database implements IDatabase
         $dsn = $driver . ':' . implode(';', $stack);
 
         if (
-            in_array($this->type, ['mysql', 'mssql']) &&
+            in_array($this->type, ['mysql', 'pgsql', 'sybase', 'mssql']) &&
             isset($options['charset'])
         ) {
             $commands[] = "SET NAMES '{$options['charset']}'" . (
@@ -343,29 +359,31 @@ class Database implements IDatabase
                 $dsn,
                 $options['username'] ?? null,
                 $options['password'] ?? null,
-                array_merge($option, [PDO::ATTR_ERRMODE => $options['error'] ?? PDO::ERRMODE_SILENT])
+                $option
             );
+
+            if (isset($options['error'])) {
+                $this->pdo->setAttribute(
+                    PDO::ATTR_ERRMODE,
+                    in_array($options['error'], [
+                        PDO::ERRMODE_SILENT,
+                        PDO::ERRMODE_WARNING,
+                        PDO::ERRMODE_EXCEPTION
+                    ]) ?
+                    $options['error'] :
+                    PDO::ERRMODE_SILENT
+                );
+            }
 
             if (isset($options['command']) && is_array($options['command'])) {
                 $commands = array_merge($commands, $options['command']);
             }
 
-            $this->executeCommands($commands);
+            foreach ($commands as $value) {
+                $this->pdo->exec($value);
+            }
         } catch (PDOException $e) {
             throw new PDOException($e->getMessage());
-        }
-    }
-
-    /**
-     * Execute a series of SQL commands on the PDO connection.
-     *
-     * @param array $commands An array of SQL commands to execute.
-     * @throws PDOException If an error occurs while executing the SQL commands.
-     */
-    private function executeCommands(array $commands)
-    {
-        foreach ($commands as $value) {
-            $this->pdo->exec($value);
         }
     }
 
